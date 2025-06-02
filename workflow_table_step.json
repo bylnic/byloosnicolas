@@ -1,0 +1,280 @@
+{
+  "name": "Analyse de Prix",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "id": "0f9a1394-5e76-4f18-a3f9-6c1b0a0c1d0e"
+    },
+    {
+      "parameters": {
+        "triggerTimes": {}
+      },
+      "name": "Lancer l'Analyse Manuelle",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "id": "bd9f7f7d-1c8c-4c6f-8b7a-9e3a7f5b2e1f"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "productName",
+              "value": "Vélo électrique"
+            }
+          ],
+          "json": [
+            {
+              "name": "sites",
+              "value": "[{\"name\":\"Amazon\",\"baseUrl\":\"https://www.amazon.fr\",\"searchUrlPrefix\":\"https://www.amazon.fr/s?k=\",\"productLinkSelector\":\"h2 a.a-link-normal\",\"priceSelector\":\"span.a-price-whole\",\"deliverySelector\":\"#mir-layout-DELIVERY_BLOCK .a-spacing-base\",\"warrantySelector\":\"\",\"urlSelector\":\"\"},{\"name\":\"Decathlon\",\"baseUrl\":\"https://www.decathlon.fr\",\"searchUrlPrefix\":\"https://www.decathlon.fr/search?Ntt=\",\"productLinkSelector\":\"a.dpb-product-model-link\",\"priceSelector\":\"div[data-testid='price-information'] span\",\"deliverySelector\":\"\",\"warrantySelector\":\"\",\"urlSelector\":\"\"},{\"name\":\"Boulanger\",\"baseUrl\":\"https://www.boulanger.com\",\"searchUrlPrefix\":\"https://www.boulanger.com/c/\",\"searchUrlNeedsProductNameInPath\":true,\"productLinkSelector\":\"a.product-item__title\",\"priceSelector\":\".price__amount\",\"deliverySelector\":\"\",\"warrantySelector\":\"\",\"urlSelector\":\"\"}]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Configuration Initiale",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ],
+      "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+    },
+    {
+      "parameters": {
+        "fieldToSplit": "={{$json.sites}}",
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Itérer sur chaque site",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "id": "f1e2d3c4-b5a6-7890-1234-abcdef567890"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "fullSearchUrl",
+              "value": "{{ $json.searchUrlNeedsProductNameInPath === true ? $json.searchUrlPrefix + $node['Configuration Initiale'].json.productName.toLowerCase().replace(/ /g, '-') : $json.searchUrlPrefix + encodeURIComponent($node['Configuration Initiale'].json.productName) }}"
+            }
+          ]
+        },
+        "options": {
+          "keepOnlySet": false
+        }
+      },
+      "name": "Construire l'URL de recherche",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ],
+      "id": "c2d3e4f5-a6b7-8901-2345-abcdef123456"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.fullSearchUrl}}",
+        "method": "GET",
+        "options": {
+          "response": {
+            "neverError": true,
+            "responseType": "string"
+          }
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"
+            }
+          ]
+        }
+      },
+      "name": "Accéder à la page de recherche",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ],
+      "id": "d3e4f5a6-b7c8-9012-3456-bcdefa234567"
+    },
+    {
+      "parameters": {
+        "sourceValue": "={{$node[\"Accéder à la page de recherche\"].json.data}}",
+        "extractionValues": [
+          {
+            "key": "price",
+            "cssSelector": "={{$json.priceSelector}}",
+            "returnValue": "text"
+          },
+          {
+            "key": "delivery",
+            "cssSelector": "={{$json.deliverySelector}}",
+            "returnValue": "text"
+          },
+          {
+            "key": "productLink",
+            "cssSelector": "={{$json.productLinkSelector}}",
+            "returnValue": "attribute",
+            "attribute": "href"
+          }
+        ],
+        "options": {
+          "includeHtml": false,
+          "keepSource": false,
+          "trim": true,
+          "continueOnFail": true
+        }
+      },
+      "name": "Extraire les données du produit",
+      "type": "n8n-nodes-base.htmlExtract",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        300
+      ],
+      "id": "e4f5a6b7-c8d9-0123-4567-cdefab345678"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "siteName",
+              "value": "={{$json.name}}"
+            },
+            {
+              "name": "price",
+              "value": "={{$node['Extraire les données du produit'].json.price ? $node['Extraire les données du produit'].json.price.text.trim() : \"Non précisé\"}}"
+            },
+            {
+              "name": "deliveryInfo",
+              "value": "={{$node['Extraire les données du produit'].json.delivery ? $node['Extraire les données du produit'].json.delivery.text.trim() : \"Non précisé\"}}"
+            },
+            {
+              "name": "extractedProductLink",
+              "value": "={{$node['Extraire les données du produit'].json.productLink ? $node['Extraire les données du produit'].json.productLink.href : \"Non trouvé\"}}"
+            },
+            {
+              "name": "warrantyInfo",
+              "value": "Non précisé"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{new Date().toISOString()}}"
+            },
+            {
+              "name": "searchPageUrl",
+              "value": "={{$node['Accéder à la page de recherche'].json.request.url}}"
+            }
+          ]
+        },
+        "options": {
+          "keepOnlySet": false
+        }
+      },
+      "name": "Nettoyer et Structurer les Données Produit",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        300
+      ],
+      "id": "f5a6b7c8-d9e0-1234-5678-defabc456789"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "simulatedScreenshotDescription",
+              "value": "Capture simulée pour {{$json.siteName}}: Prix affiché: {{$json.price}}. Informations de livraison: {{$json.deliveryInfo}}. Lien produit identifié: {{$json.extractedProductLink}}. URL de recherche utilisée: {{$json.searchPageUrl}}."
+            }
+          ]
+        },
+        "options": {
+          "keepOnlySet": false
+        }
+      },
+      "name": "Générer Description Textuelle (Capture Simulée)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1850,
+        300
+      ],
+      "id": "a0b1c2d3-e4f5-a6b7-c8d9-e0f1a2b3c4d5"
+    },
+    {
+      "parameters": {},
+      "name": "Fin du traitement pour ce site",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        300
+      ],
+      "id": "b1c2d3e4-f5a6-b7c8-d9e0-f1a2b3c4d5e6"
+    },
+    {
+      "parameters": {
+        "operation": "writeFile",
+        "fileFormat": "xlsx",
+        "fileName": "Comparatif_Produits_Velo_Electrique",
+        "binaryPropertyName": "data",
+        "columns": [
+          { "header": "Site", "value": "={{$json.siteName}}" },
+          { "header": "Prix TTC", "value": "={{$json.price}}" },
+          { "header": "Livraison", "value": "={{$json.deliveryInfo}}" },
+          { "header": "Garantie", "value": "={{$json.warrantyInfo}}" },
+          { "header": "Lien", "value": "={{$json.extractedProductLink}}" },
+          { "header": "Description (Simulée)", "value": "={{$json.simulatedScreenshotDescription}}" }
+        ],
+        "options": {}
+      },
+      "name": "Générer Tableau Comparatif Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        300
+      ],
+      "id": "c2d3e4f5-a6b7-c8d9-e0f1-a2b3c4d5e6f7"
+    }
+  ],
+  "connections": {
+    "Start": { "main": [ [ { "node": "Lancer l'Analyse Manuelle", "type": "main" } ] ] },
+    "Lancer l'Analyse Manuelle": { "main": [ [ { "node": "Configuration Initiale", "type": "main" } ] ] },
+    "Configuration Initiale": { "main": [ [ { "node": "Itérer sur chaque site", "type": "main" } ] ] },
+    "Itérer sur chaque site": { "main": [ [ { "node": "Construire l'URL de recherche", "type": "main" } ] ] },
+    "Construire l'URL de recherche": { "main": [ [ { "node": "Accéder à la page de recherche", "type": "main" } ] ] },
+    "Accéder à la page de recherche": { "main": [ [ { "node": "Extraire les données du produit", "type": "main" } ] ] },
+    "Extraire les données du produit": { "main": [ [ { "node": "Nettoyer et Structurer les Données Produit", "type": "main" } ] ] },
+    "Nettoyer et Structurer les Données Produit": { "main": [ [ { "node": "Générer Description Textuelle (Capture Simulée)", "type": "main" } ] ] },
+    "Générer Description Textuelle (Capture Simulée)": { "main": [ [ { "node": "Fin du traitement pour ce site", "type": "main" } ] ] },
+    "Fin du traitement pour ce site": { "main": [ [ { "node": "Générer Tableau Comparatif Excel", "type": "main" } ] ] }
+  },
+  "active": false,
+  "settings": {},
+  "id": "workflow_initial_setup"
+}
